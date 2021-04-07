@@ -254,6 +254,53 @@ const getPaymentState = async (request, response) => {
   }
 };
 
+// Eamon's added function
+
+/* 
+* This function will set the passed in charger's 
+* SERVER Disable EVSE? to true and
+* SERVER Enable EVSE? to false
+*/
+const setStationOff = async (request, response) => {
+  try {
+    const updates = {
+      "SERVER Disable EVSE?": true,
+      "SERVER Enable EVSE?": false,
+    };
+    let chargerId = request.params.id.toString();
+    let chargerRef = admin.database().ref(chargerId);
+    await chargerRef.update(updates);
+    response.status(200).json({ success: true });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+/* 
+* This function will set the passed in charger's 
+* SERVER Disable EVSE? to false and
+* SERVER Enable EVSE? to true
+*/
+const setStationOn = async (request, response) => {
+  try {
+    const updates = {
+      "SERVER Disable EVSE?": false,
+      "SERVER Enable EVSE?": true,
+    };
+    let chargerId = request.params.id.toString();
+    let chargerRef = admin.database().ref(chargerId);
+    await chargerRef.update(updates);
+    response.status(200).json({ success: true });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+// End of  Eamon's added function
+
+
 module.exports = {
   getAllChargers,
   addCharger,
@@ -263,6 +310,8 @@ module.exports = {
   getNextCurrent,
   getTemperature,
   getPaymentState,
+  setStationOff, // added by Eamon
+  setStationOn, // added by Eamon 
 };
 
 // dashApp.use(cors({ origin: true }));
