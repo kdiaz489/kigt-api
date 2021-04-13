@@ -263,12 +263,14 @@ const getPaymentState = async (request, response) => {
 */
 const setStationOff = async (request, response) => {
   try {
+    let charger = request.body;
+    let chargerID = charger.chargerId.toString();
     const updates = {
       "SERVER Disable EVSE?": true,
       "SERVER Enable EVSE?": false,
     };
-    let chargerId = request.params.id.toString();
-    let chargerRef = admin.database().ref(chargerId);
+    //let chargerId = request.params.chargerId.toString();
+    let chargerRef = admin.database().ref(chargerID);
     await chargerRef.update(updates);
     response.status(200).json({ success: true });
   } catch (error) {
@@ -284,12 +286,14 @@ const setStationOff = async (request, response) => {
 */
 const setStationOn = async (request, response) => {
   try {
+    let charger = request.body;
+    let chargerID = charger.chargerId.toString();
     const updates = {
       "SERVER Disable EVSE?": false,
       "SERVER Enable EVSE?": true,
     };
-    let chargerId = request.params.id.toString();
-    let chargerRef = admin.database().ref(chargerId);
+    //let chargerId = request.params.chargerId.toString();
+    let chargerRef = admin.database().ref(chargerID);
     await chargerRef.update(updates);
     response.status(200).json({ success: true });
   } catch (error) {
