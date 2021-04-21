@@ -192,8 +192,7 @@ const getTemperature = async (request, response) => {
     let temperatureData = snapShot.docs.map((doc) => ({
       x: format(doc.data().timestamp._seconds * 1000, 'MM/dd/yy HH:mm:ss'),
       y: +doc
-        .data()
-        ['EVSE Temperature'].slice(
+        .data()['EVSE Temperature'].slice(
           0,
           doc.data()['EVSE Temperature'].length - 2
         ),
@@ -241,9 +240,9 @@ const getPaymentState = async (request, response) => {
       console.log(typeof val);
       let avg = (valuesMap[val] / snapShot.docs.length) * 100;
       paymentData.push({
-        id: val == 'false' ? 'Not Paid' : 'Paid',
+        id: val === 'false' ? 'Not Paid' : 'Paid',
         value: avg,
-        label: val == 'false' ? 'Not Paid' : 'Paid',
+        label: val === 'false' ? 'Not Paid' : 'Paid',
       });
     }
 
@@ -267,7 +266,7 @@ const setStationOff = async (request, response) => {
       "SERVER Disable EVSE?": true,
       "SERVER Enable EVSE?": false,
     };
-    let chargerId = request.params.id.toString();
+    let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargerId);
     await chargerRef.update(updates);
     response.status(200).json({ success: true });
@@ -288,7 +287,7 @@ const setStationOn = async (request, response) => {
       "SERVER Disable EVSE?": false,
       "SERVER Enable EVSE?": true,
     };
-    let chargerId = request.params.id.toString();
+    let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargerId);
     await chargerRef.update(updates);
     response.status(200).json({ success: true });
