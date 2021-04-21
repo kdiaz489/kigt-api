@@ -68,6 +68,7 @@ const addCharger = async (request, response) => {
  * @route  PUT /api/chargers/:id
  * @access Private
  */
+
 const updateCharger = async (request, response) => {
   try {
     let updates = request.body;
@@ -263,16 +264,16 @@ const getPaymentState = async (request, response) => {
 */
 const setStationOff = async (request, response) => {
   try {
-    let charger = request.body;
-    let chargerID = charger.chargerId.toString();
-    const updates = {
+    let chargers = request.body;
+    let chargerID = chargers.charger;
+    const update = {
       "SERVER Disable EVSE?": true,
       "SERVER Enable EVSE?": false,
     };
     //let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargerID);
-    await chargerRef.update(updates);
-    response.status(200).json({ success: true });
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, chargerID });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
@@ -286,16 +287,16 @@ const setStationOff = async (request, response) => {
 */
 const setStationOn = async (request, response) => {
   try {
-    let charger = request.body;
-    let chargerID = charger.chargerId.toString();
-    const updates = {
+    let chargers = request.body;
+    let chargerID = chargers.charger;
+    const update = {
       "SERVER Disable EVSE?": false,
       "SERVER Enable EVSE?": true,
     };
     //let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargerID);
-    await chargerRef.update(updates);
-    response.status(200).json({ success: true });
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, chargerID });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
