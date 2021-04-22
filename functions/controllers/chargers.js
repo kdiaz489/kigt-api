@@ -293,7 +293,7 @@ const setStationOn = async (request, response) => {
       "SERVER Enable EVSE?": true,
     };
     //let chargerId = request.params.chargerId.toString();
-    let chargerRef = admin.database().ref(chargerID);
+    let chargerRef = admin.database().ref(chargers.charger);
     await chargerRef.update(update);
     response.status(200).json({ success: true, chargerID });
   } catch (error) {
