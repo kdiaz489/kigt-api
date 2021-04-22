@@ -269,10 +269,12 @@ const setStationOff = async (request, response) => {
       "SERVER Disable EVSE?": true,
       "SERVER Enable EVSE?": false,
     };
+
     //let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargerID);
     await chargerRef.update(update);
     response.status(200).json({ success: true, chargerID });
+
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
@@ -292,10 +294,12 @@ const setStationOn = async (request, response) => {
       "SERVER Disable EVSE?": false,
       "SERVER Enable EVSE?": true,
     };
+
     //let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargers.charger);
     await chargerRef.update(update);
     response.status(200).json({ success: true, chargerID });
+
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
