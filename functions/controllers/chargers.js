@@ -3,6 +3,25 @@ const { getAllocated } = require('../getAllocated');
 const { format } = require('date-fns');
 
 /**
+ * @description Get a user's chargers
+ * @param {*} request
+ * @param {*} response
+ * @route  GET /api/chargers/:id
+ * @access Private
+ */
+const getCharger = async (request, response) => {
+  try {
+    const { chargerId } = request.params;
+    console.log(`chargerId = ${chargerId}`);
+    let rootSnapshot = await admin.database().ref(chargerId).once('value');
+    let charger = rootSnapshot.val();
+
+    return response.status(200).json({ charger });
+  } catch (error) {
+    return response.status(400).json({ error: error.message });
+  }
+};
+/**
  * @description Get all of user's chargers
  * @param {*} request
  * @param {*} response
@@ -13,6 +32,7 @@ const getAllChargers = async (request, response) => {
   try {
     let chargers = [];
     const { uid } = request;
+
     let userSnapShot = await admin
       .firestore()
       .collection('users')
@@ -89,14 +109,18 @@ const getCurrent = async (request, response) => {
       .collection('chargers')
       .doc(chargerId)
       .collection('snapShots')
-      .limit(5)
+      .limit(4)
       .get();
+
+    let length = snapShot.docs.length;
+
     let maxCurrentData = snapShot.docs.map((doc) => ({
-      x: format(doc.data().timestamp._seconds * 1000, 'MM/dd/yy HH:mm:ss'),
+      x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
       y: +doc.data()['EVSE Max Current'],
     }));
+
     let calcCurrentData = snapShot.docs.map((doc) => ({
-      x: format(doc.data().timestamp._seconds * 1000, 'MM/dd/yy HH:mm:ss'),
+      x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
       y: doc.data()['EVSE Calculated Current']
         ? +doc.data()['EVSE Calculated Current']
         : +doc.data()['EVSE Max Current'] + 1,
@@ -113,7 +137,13 @@ const getCurrent = async (request, response) => {
         data: calcCurrentData,
       },
     ];
-    response.status(200).json({ success: true, data });
+
+    response.status(200).json({
+      success: true,
+      data,
+      firstDoc: snapShot.docs[0].id,
+      lastDoc: snapShot.docs[length - 1].id,
+    });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
@@ -122,26 +152,19 @@ const getCurrent = async (request, response) => {
 const getPrevCurrent = async (request, response) => {
   try {
     let { firstDoc, chargerId } = request.body;
-    let firstQueryDoc = await admin
-      .firestore()
-      .collection('chargers')
-      .doc(chargerId)
+    let ref = admin.firestore().collection('chargers').doc(chargerId);
+    let firstQueryDoc = await ref.collection('snapShots').doc(firstDoc).get();
+
+    let prev = await ref
       .collection('snapShots')
-      .doc(firstDoc)
-      .get();
+      .orderBy('timestamp')
+      .endBefore(firstQueryDoc.data().timestamp)
+      .limitToLast(4);
 
-    let snapShot = await admin
-      .firestore()
-      .collection('chargers')
-      .doc('113882052')
-      .collection('snapShots')
-      .endBefore(firstQueryDoc)
-      .limitToLast(5)
-      .get();
+    let prevSnapShot = await prev.get();
 
-    let data = snapShot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    let data = prevSnapShot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-    console.log(data);
     response.status(200).json({ success: true, data });
   } catch (error) {
     console.log(error);
@@ -151,24 +174,19 @@ const getPrevCurrent = async (request, response) => {
 const getNextCurrent = async (request, response) => {
   try {
     let { lastDoc, chargerId } = request.body;
-    let lastQueryDoc = await admin
-      .firestore()
-      .collection('chargers')
-      .doc(chargerId)
-      .collection('snapShots')
-      .doc(lastDoc)
-      .get();
-    let snapShot = await admin
-      .firestore()
-      .collection('chargers')
-      .doc('113882052')
-      .collection('snapShots')
-      .startAfter(lastQueryDoc)
-      .limit(5)
-      .get();
-    let data = snapShot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    let ref = admin.firestore().collection('chargers').doc(chargerId);
+    let lastQueryDoc = await ref.collection('snapShots').doc(lastDoc).get();
 
-    console.log(data);
+    let next = await ref
+      .collection('snapShots')
+      .orderBy('timestamp')
+      .startAfter(lastQueryDoc.data().timestamp)
+      .limit(5);
+
+    let nextSnapshot = await next.get();
+    console.log(nextSnapshot.docs);
+    let data = nextSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
     response.status(200).json({ success: true, data });
   } catch (error) {
     console.log(error);
@@ -187,16 +205,16 @@ const getTemperature = async (request, response) => {
       .limit(5)
       .get();
 
-    snapShot.docs.map((doc) => console.log(doc.data()));
-
     let temperatureData = snapShot.docs.map((doc) => ({
-      x: format(doc.data().timestamp._seconds * 1000, 'MM/dd/yy HH:mm:ss'),
-      y: +doc
-        .data()
-        ['EVSE Temperature'].slice(
-          0,
-          doc.data()['EVSE Temperature'].length - 2
-        ),
+      x: format(doc.data().timestamp._seconds * 1000, 'HH:mm:ss'),
+      y: doc.data()['EVSE Temperature']
+        ? +doc
+            .data()
+            ['EVSE Temperature'].slice(
+              0,
+              doc.data()['EVSE Temperature'].length - 2
+            )
+        : 0,
     }));
 
     let data = [
@@ -238,7 +256,6 @@ const getPaymentState = async (request, response) => {
     }
 
     for (let val of Object.keys(valuesMap)) {
-      console.log(typeof val);
       let avg = (valuesMap[val] / snapShot.docs.length) * 100;
       paymentData.push({
         id: val == 'false' ? 'Not Paid' : 'Paid',
@@ -256,6 +273,7 @@ const getPaymentState = async (request, response) => {
 
 module.exports = {
   getAllChargers,
+  getCharger,
   addCharger,
   updateCharger,
   getCurrent,
@@ -264,116 +282,3 @@ module.exports = {
   getTemperature,
   getPaymentState,
 };
-
-// dashApp.use(cors({ origin: true }));
-
-// dashApp.get('/filterData', async (request, response) => {
-//   const chargerId = request.body.id;
-
-//   try {
-//     let snapshot = await admin
-//       .firestore()
-//       .collection('chargers')
-//       .doc(chargerId)
-//       .collection('snapShots')
-//       .get();
-
-//     let data = snapshot.docs.map((doc) => {
-//       return { id: doc.id, ...doc.data() };
-//     });
-//     response.status(200).send({ data });
-//   } catch (error) {
-//     response.status(400).send({ error: error.message });
-//   }
-// });
-
-// dashApp.get('/filterByDate', async (request, response) => {
-//   // To Do - Confirm time coming from front end is in utc
-//   const time = new Date(request.body.time);
-
-//   const chargerId = request.body.id;
-//   try {
-//     let snapshot = await admin
-//       .firestore()
-//       .collection('chargers')
-//       .doc(chargerId)
-//       .collection('snapShots')
-//       .where('timestamp', '>=', time)
-//       .get();
-//     let data = snapshot.docs.map((doc) => {
-//       console.log(doc.data().timestamp.toDate());
-//       return { id: doc.id, ...doc.data() };
-//     });
-//     response.status(200).send({ data });
-//   } catch (error) {
-//     response.status(400).send({ error: error.message });
-//   }
-// });
-
-// dashApp.get('/filterByTime', async (request, response) => {
-//   const time = new Date(request.body.time);
-//   console.log(time.getUTCDate());
-//   console.log(time);
-//   const chargerId = request.body.id;
-//   try {
-//     let snapshot = await admin
-//       .firestore()
-//       .collection('chargers')
-//       .doc(chargerId)
-//       .collection('snapShots')
-//       .where('timestamp', '>=', time)
-//       .get();
-//     let data = snapshot.docs.map((doc) => {
-//       console.log(doc.data().timestamp.toDate());
-//       return { id: doc.id, ...doc.data() };
-//     });
-//     response.status(200).send({ data });
-//   } catch (error) {
-//     response.status(400).send({ error: error.message });
-//   }
-// });
-
-// dashApp.get('/getAggregate', async (request, response) => {
-//   //   response.set('Access-Control-Allow-Origin', '*');
-//   //   response.set('Access-Control-Allow-Methods', 'GET, PUT, POST, OPTIONS');
-//   //   response.set('Access-Control-Allow-Headers', '*');
-//   try {
-//     let data = [];
-//     let chargers = await admin.firestore().collection('chargers').get();
-//     let numChargers = 0;
-//     numChargers = chargers.docs.length;
-//     let rtdb = admin.database().ref();
-//     let available = numChargers * 30;
-//     //Not needed for now
-//     // let now = new Date();
-//     // let i = 6;
-//     // let dates = [now.getDate()];
-//     // while (i--) {
-//     //   now.setDate(now.getDate() - 1);
-//     //   dates.push(now.toUTCString());
-//     // }
-//     // dates.reverse();
-//     // console.log('Dates Array', dates);
-
-//     let snapshot = await admin
-//       .firestore()
-//       .collection('chargers')
-//       .doc('113882052')
-//       .collection('snapShots')
-//       .get();
-
-//     const { allocated } = await getAllocated(rtdb);
-
-//     data = snapshot.docs.map((doc) => {
-//       return { id: doc.id, allocated, available, ...doc.data() };
-//     });
-
-//     response.status(200).send({ allocated, available, data });
-//   } catch (err) {
-//     response.status(400).send({ error: err.message });
-//   }
-
-//   return new Promise((resolve, reject) => {});
-// });
-
-// exports.api = functions.https.onRequest(dashApp);
