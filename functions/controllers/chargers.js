@@ -3,7 +3,7 @@ const { getAllocated } = require('../getAllocated');
 const { format } = require('date-fns');
 
 /**
- * @description Get a user's chargers
+ * @description Get a specific charger's data
  * @param {*} request
  * @param {*} response
  * @route  GET /api/chargers/:id
@@ -12,7 +12,6 @@ const { format } = require('date-fns');
 const getCharger = async (request, response) => {
   try {
     const { chargerId } = request.params;
-    console.log(`chargerId = ${chargerId}`);
     let rootSnapshot = await admin.database().ref(chargerId).once('value');
     let charger = rootSnapshot.val();
 
@@ -88,6 +87,7 @@ const addCharger = async (request, response) => {
  * @route  PUT /api/chargers/:id
  * @access Private
  */
+
 const updateCharger = async (request, response) => {
   try {
     let updates = request.body;
@@ -101,6 +101,13 @@ const updateCharger = async (request, response) => {
   }
 };
 
+/**
+ * @description Get a charger's current data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getCurrent/:id
+ * @access Private
+ */
 const getCurrent = async (request, response) => {
   try {
     let { chargerId } = request.params;
@@ -149,6 +156,14 @@ const getCurrent = async (request, response) => {
     response.status(400).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * @description Get a charger's current data - used in pagination of data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getPrevCurrent/:id
+ * @access Private
+ */
 const getPrevCurrent = async (request, response) => {
   try {
     let { firstDoc, chargerId } = request.body;
@@ -171,6 +186,14 @@ const getPrevCurrent = async (request, response) => {
     response.status(400).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * @description Get a charger's current data - used in pagination of data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getNextCurrent/:id
+ * @access Private
+ */
 const getNextCurrent = async (request, response) => {
   try {
     let { lastDoc, chargerId } = request.body;
@@ -194,6 +217,13 @@ const getNextCurrent = async (request, response) => {
   }
 };
 
+/**
+ * @description Get a charger's temperature data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getTemperature/:id
+ * @access Private
+ */
 const getTemperature = async (request, response) => {
   try {
     let { chargerId } = request.params;
@@ -231,6 +261,13 @@ const getTemperature = async (request, response) => {
   }
 };
 
+/**
+ * @description Get a charger's payment state data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getPaymentState/:id
+ * @access Private
+ */
 const getPaymentState = async (request, response) => {
   try {
     let { chargerId } = request.params;
@@ -258,9 +295,9 @@ const getPaymentState = async (request, response) => {
     for (let val of Object.keys(valuesMap)) {
       let avg = (valuesMap[val] / snapShot.docs.length) * 100;
       paymentData.push({
-        id: val == 'false' ? 'Not Paid' : 'Paid',
+        id: val === 'false' ? 'Not Paid' : 'Paid',
         value: avg,
-        label: val == 'false' ? 'Not Paid' : 'Paid',
+        label: val === 'false' ? 'Not Paid' : 'Paid',
       });
     }
 
@@ -271,14 +308,68 @@ const getPaymentState = async (request, response) => {
   }
 };
 
+// Eamon's added function
+
+/*
+ * This function will set the passed in charger's
+ * SERVER Disable EVSE? to true and
+ * SERVER Enable EVSE? to false
+ */
+const setStationOff = async (request, response) => {
+  try {
+    let chargers = request.body;
+    let chargerID = chargers.charger;
+    const update = {
+      'SERVER Disable EVSE?': true,
+      'SERVER Enable EVSE?': false,
+    };
+
+    //let chargerId = request.params.chargerId.toString();
+    let chargerRef = admin.database().ref(chargerID);
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, chargerID });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+/*
+ * This function will set the passed in charger's
+ * SERVER Disable EVSE? to false and
+ * SERVER Enable EVSE? to true
+ */
+const setStationOn = async (request, response) => {
+  try {
+    let chargers = request.body;
+    let chargerID = chargers.charger;
+    const update = {
+      'SERVER Disable EVSE?': false,
+      'SERVER Enable EVSE?': true,
+    };
+
+    //let chargerId = request.params.chargerId.toString();
+    let chargerRef = admin.database().ref(chargers.charger);
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, chargerID });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+// End of  Eamon's added function
+
 module.exports = {
-  getAllChargers,
-  getCharger,
-  addCharger,
-  updateCharger,
-  getCurrent,
-  getPrevCurrent,
-  getNextCurrent,
-  getTemperature,
-  getPaymentState,
+  getAllChargers, // added by Karen
+  getCharger, // added by Karen
+  addCharger, // added by Karen
+  updateCharger, // added by Karen
+  getCurrent, // added by Karen
+  getPrevCurrent, // added by Karen
+  getNextCurrent, // added by Karen
+  getTemperature, // added by Karen
+  getPaymentState, // added by Karen
+  setStationOff, // added by Eamon
+  setStationOn, // added by Eamon
 };
