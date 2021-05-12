@@ -9,12 +9,12 @@ router.get(
   controller.getCharger
 );
 router.get('/getCurrent/:chargerId', controller.getCurrent);
-router.get('/getNextCurrent/', controller.getNextCurrent);
-router.get('/getPrevCurrent/', controller.getPrevCurrent);
+router.get('/getNextCurrent/:chargerId', controller.getNextCurrent);
+router.get('/getPrevCurrent/:chargerId', controller.getPrevCurrent);
 router.get('/getTemperature/:chargerId', controller.getTemperature);
 router.get('/getPaymentState/:chargerId', controller.getPaymentState);
 router.post('/', checkIfAuthenticated, controller.addCharger);
-router.put('/updateCharger/:id', controller.updateCharger);
+router.put('/updateCharger/:chargerId', controller.updateCharger);
 router.put('/setStationOff', controller.setStationOff); // added by Eamon
 router.put('/setStationOn', controller.setStationOn); // added by Eamon
 

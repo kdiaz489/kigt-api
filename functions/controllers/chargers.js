@@ -3,6 +3,7 @@ const { getAllocated } = require('../getAllocated');
 const { format } = require('date-fns');
 
 /**
+ * @author Karen S. Diaz
  * @description Get a specific charger's data
  * @param {*} request
  * @param {*} response
@@ -21,6 +22,7 @@ const getCharger = async (request, response) => {
   }
 };
 /**
+ * @author Karen S. Diaz
  * @description Get all of user's chargers
  * @param {*} request
  * @param {*} response
@@ -37,7 +39,9 @@ const getAllChargers = async (request, response) => {
       .collection('users')
       .where('uid', '==', uid)
       .get();
+
     let user = userSnapShot.docs[0];
+    console.log(user.data());
     let usersChargers = user.data().chargers;
     let rootSnapshot = await admin.database().ref().once('value');
     let rootObject = rootSnapshot.val();
@@ -54,11 +58,13 @@ const getAllChargers = async (request, response) => {
 
     return response.status(200).json({ chargers });
   } catch (error) {
+    console.log(error.message);
     return response.status(400).json({ error: error.message });
   }
 };
 
 /**
+ * @author Karen S. Diaz
  * @description Add charger to user's array of chargers
  * @param {*} request
  * @param {*} response
@@ -81,6 +87,7 @@ const addCharger = async (request, response) => {
 };
 
 /**
+ * @author Karen S. Diaz
  * @description Update charger
  * @param {*} request
  * @param {*} response
@@ -91,7 +98,7 @@ const addCharger = async (request, response) => {
 const updateCharger = async (request, response) => {
   try {
     let updates = request.body;
-    let chargerId = request.params.id.toString();
+    let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargerId);
     await chargerRef.update(updates);
     response.status(200).json({ success: true });
@@ -102,15 +109,19 @@ const updateCharger = async (request, response) => {
 };
 
 /**
+ * @author Karen S. Diaz
  * @description Get a charger's current data
  * @param {*} request
  * @param {*} response
- * @route  PUT /api/chargers/getCurrent/:id
+ * @route  PUT /api/chargers/getCurrent/:chargerId
  * @access Private
  */
 const getCurrent = async (request, response) => {
   try {
+    // get charger id from url
     let { chargerId } = request.params;
+
+    // get a snapshot of the data, limit of 4 data points
     let snapShot = await admin
       .firestore()
       .collection('chargers')
@@ -118,29 +129,37 @@ const getCurrent = async (request, response) => {
       .collection('snapShots')
       .limit(4)
       .get();
-
+    if (snapShot.empty) {
+      throw new Error('No data available for this charger.');
+    }
     let length = snapShot.docs.length;
 
+    // calculate data for max current line
+    // x axis is time
+    // y axis is value of EVSE Max Current OR 1 if undefined
     let maxCurrentData = snapShot.docs.map((doc) => ({
       x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
-      y: +doc.data()['EVSE Max Current'],
+      y: doc.data()['EVSE Max Current'] ? +doc.data()['EVSE Max Current'] : 1,
     }));
 
+    // calculate data for calculated current line
+    // x axis is time
+    // y axis is value of EVSE Calculated Current OR 1 if undefined
     let calcCurrentData = snapShot.docs.map((doc) => ({
       x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
       y: doc.data()['EVSE Calculated Current']
         ? +doc.data()['EVSE Calculated Current']
-        : +doc.data()['EVSE Max Current'] + 1,
+        : 1,
     }));
+
+    // data returned
     let data = [
       {
         id: 'EVSE Max Current',
-        color: 'hsl(209,70%,50%)',
         data: maxCurrentData,
       },
       {
         id: 'EVSE Calculated Current',
-        color: 'hsl(256,70%,50%)',
         data: calcCurrentData,
       },
     ];
@@ -152,12 +171,13 @@ const getCurrent = async (request, response) => {
       lastDoc: snapShot.docs[length - 1].id,
     });
   } catch (error) {
-    console.log(error);
+    console.log('error = ', error);
     response.status(400).json({ success: false, error: error.message });
   }
 };
 
 /**
+ * @author Karen S. Diaz
  * @description Get a charger's current data - used in pagination of data
  * @param {*} request
  * @param {*} response
@@ -188,6 +208,7 @@ const getPrevCurrent = async (request, response) => {
 };
 
 /**
+ * @author Karen S. Diaz
  * @description Get a charger's current data - used in pagination of data
  * @param {*} request
  * @param {*} response
@@ -218,15 +239,17 @@ const getNextCurrent = async (request, response) => {
 };
 
 /**
+ * @author Karen S. Diaz
  * @description Get a charger's temperature data
  * @param {*} request
  * @param {*} response
- * @route  PUT /api/chargers/getTemperature/:id
+ * @route  PUT /api/chargers/getTemperature/:chargerId
  * @access Private
  */
 const getTemperature = async (request, response) => {
   try {
     let { chargerId } = request.params;
+    console.log(chargerId);
     let snapShot = await admin
       .firestore()
       .collection('chargers')
@@ -234,6 +257,10 @@ const getTemperature = async (request, response) => {
       .collection('snapShots')
       .limit(5)
       .get();
+
+    if (snapShot.empty) {
+      throw new Error('No data available for this charger.');
+    }
 
     let temperatureData = snapShot.docs.map((doc) => ({
       x: format(doc.data().timestamp._seconds * 1000, 'HH:mm:ss'),
@@ -246,11 +273,10 @@ const getTemperature = async (request, response) => {
             )
         : 0,
     }));
-
+    console.log(temperatureData);
     let data = [
       {
         id: 'EVSE Temperature',
-        color: 'hsl(209,70%,50%)',
         data: temperatureData,
       },
     ];
@@ -262,6 +288,7 @@ const getTemperature = async (request, response) => {
 };
 
 /**
+ * @author Karen S. Diaz
  * @description Get a charger's payment state data
  * @param {*} request
  * @param {*} response
@@ -278,7 +305,9 @@ const getPaymentState = async (request, response) => {
       .collection('snapShots')
       .limit(5)
       .get();
-
+    if (snapShot.empty) {
+      throw new Error('No data available for this charger.');
+    }
     let valuesMap = {};
     let paymentData = [];
 
@@ -361,15 +390,15 @@ const setStationOn = async (request, response) => {
 // End of  Eamon's added function
 
 module.exports = {
-  getAllChargers, // added by Karen
-  getCharger, // added by Karen
-  addCharger, // added by Karen
-  updateCharger, // added by Karen
-  getCurrent, // added by Karen
-  getPrevCurrent, // added by Karen
-  getNextCurrent, // added by Karen
-  getTemperature, // added by Karen
-  getPaymentState, // added by Karen
+  getAllChargers,
+  getCharger,
+  addCharger,
+  updateCharger,
+  getCurrent,
+  getPrevCurrent,
+  getNextCurrent,
+  getTemperature,
+  getPaymentState,
   setStationOff, // added by Eamon
   setStationOn, // added by Eamon
 };
