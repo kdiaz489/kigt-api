@@ -387,6 +387,140 @@ const setStationOn = async (request, response) => {
   }
 };
 
+/*
+ * This function get the user id assigned to the charger
+ */
+const getUser = async (request, response) => {
+  try {
+    let { chargerId } = request.params;
+    console.log('Performing getUser on charger ' + chargerId);
+
+    let snapShot = await admin.database().ref(chargerId).get();
+
+    let User = snapShot.child('SERVER User Sync');
+
+    response.status(200).json({ success: true, User });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+/*
+ * This function sets the user id assigned to the charger
+ */
+const setUser = async (request, response) => {
+  try {
+    let info = request.body;
+    let chargerID = info.charger;
+    let User = info.user;
+    const update = {
+      'SERVER User Sync': User,
+    };
+    let chargerRef = admin.database().ref(chargerID);
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, User });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+/*
+ * This function removes the user id assigned to the charger
+ */
+const removeUser = async (request, response) => {
+  try {
+    let info = request.body;
+    let chargerID = info.charger;
+    const update = {
+      'SERVER User Sync': '',
+    };
+    let chargerRef = admin.database().ref(chargerID);
+    await chargerRef.update(update);
+    response.status(200).json({ success: true });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+/*
+ * This function will get a list of charger snapshots for the specifed charger
+ */
+const chargerHistory = async (request, response) => {
+  try {
+    let { chargerId } = request.params;
+    var dataArray = chargerId.split(';');
+    var snapShot;
+    console.log('Performing chargerHistory on charger ' + dataArray[0]);
+
+    if (dataArray[2] == null) {
+      if (dataArray[1] == null) {
+        var today = new Date();
+        var date =
+          today.getFullYear() +
+          '-' +
+          (today.getMonth() + 1) +
+          '-' +
+          today.getDate();
+        const start = admin.firestore.Timestamp.fromDate(new Date(date));
+        snapShot = await admin
+          .firestore()
+          .collection('chargers')
+          .doc(dataArray[0])
+          .collection('snapShots')
+          .where('timestamp', '>=', start)
+          .get();
+      } else {
+        const start = admin.firestore.Timestamp.fromDate(
+          new Date(dataArray[1])
+        );
+        snapShot = await admin
+          .firestore()
+          .collection('chargers')
+          .doc(dataArray[0])
+          .collection('snapShots')
+          .where('timestamp', '>=', start)
+          .get();
+      }
+    } else {
+      var tomorrow = new Date(dataArray[2]);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const start = admin.firestore.Timestamp.fromDate(new Date(dataArray[1]));
+      const end = admin.firestore.Timestamp.fromDate(tomorrow);
+      snapShot = await admin
+        .firestore()
+        .collection('chargers')
+        .doc(dataArray[0])
+        .collection('snapShots')
+        .where('timestamp', '>=', start)
+        .where('timestamp', '<=', end)
+        .get();
+    }
+
+    let historyData = snapShot.docs.map((doc) => ({
+      timestamp: format(
+        doc.data().timestamp._seconds * 1000,
+        'MM/dd/yy HH:mm:ss'
+      ),
+      data: doc.data(),
+    }));
+
+    let chargerHistory = [
+      {
+        chargerId: dataArray[0],
+        snapshots: historyData,
+      },
+    ];
+
+    await response.status(200).json({ success: true, chargerHistory });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
 // End of  Eamon's added function
 
 module.exports = {
@@ -401,4 +535,8 @@ module.exports = {
   getPaymentState,
   setStationOff, // added by Eamon
   setStationOn, // added by Eamon
+  getUser, //added by Eamon
+  setUser, // added by Eamon
+  removeUser, // added by Eamon
+  chargerHistory, // added by Eamon
 };
