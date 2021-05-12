@@ -3,6 +3,26 @@ const { getAllocated } = require('../getAllocated');
 const { format } = require('date-fns');
 
 /**
+ * @author Karen S. Diaz
+ * @description Get a specific charger's data
+ * @param {*} request
+ * @param {*} response
+ * @route  GET /api/chargers/:id
+ * @access Private
+ */
+const getCharger = async (request, response) => {
+  try {
+    const { chargerId } = request.params;
+    let rootSnapshot = await admin.database().ref(chargerId).once('value');
+    let charger = rootSnapshot.val();
+
+    return response.status(200).json({ charger });
+  } catch (error) {
+    return response.status(400).json({ error: error.message });
+  }
+};
+/**
+ * @author Karen S. Diaz
  * @description Get all of user's chargers
  * @param {*} request
  * @param {*} response
@@ -13,12 +33,15 @@ const getAllChargers = async (request, response) => {
   try {
     let chargers = [];
     const { uid } = request;
+
     let userSnapShot = await admin
       .firestore()
       .collection('users')
       .where('uid', '==', uid)
       .get();
+
     let user = userSnapShot.docs[0];
+    console.log(user.data());
     let usersChargers = user.data().chargers;
     let rootSnapshot = await admin.database().ref().once('value');
     let rootObject = rootSnapshot.val();
@@ -35,11 +58,13 @@ const getAllChargers = async (request, response) => {
 
     return response.status(200).json({ chargers });
   } catch (error) {
+    console.log(error.message);
     return response.status(400).json({ error: error.message });
   }
 };
 
 /**
+ * @author Karen S. Diaz
  * @description Add charger to user's array of chargers
  * @param {*} request
  * @param {*} response
@@ -62,6 +87,7 @@ const addCharger = async (request, response) => {
 };
 
 /**
+ * @author Karen S. Diaz
  * @description Update charger
  * @param {*} request
  * @param {*} response
@@ -72,7 +98,7 @@ const addCharger = async (request, response) => {
 const updateCharger = async (request, response) => {
   try {
     let updates = request.body;
-    let chargerId = request.params.id.toString();
+    let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargerId);
     await chargerRef.update(updates);
     response.status(200).json({ success: true });
@@ -82,94 +108,129 @@ const updateCharger = async (request, response) => {
   }
 };
 
+/**
+ * @author Karen S. Diaz
+ * @description Get a charger's current data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getCurrent/:chargerId
+ * @access Private
+ */
 const getCurrent = async (request, response) => {
   try {
+    // get charger id from url
     let { chargerId } = request.params;
+
+    // get a snapshot of the data, limit of 4 data points
     let snapShot = await admin
       .firestore()
       .collection('chargers')
       .doc(chargerId)
       .collection('snapShots')
-      .limit(5)
+      .limit(4)
       .get();
+    if (snapShot.empty) {
+      throw new Error('No data available for this charger.');
+    }
+    let length = snapShot.docs.length;
+
+    // calculate data for max current line
+    // x axis is time
+    // y axis is value of EVSE Max Current OR 1 if undefined
     let maxCurrentData = snapShot.docs.map((doc) => ({
-      x: format(doc.data().timestamp._seconds * 1000, 'MM/dd/yy HH:mm:ss'),
-      y: +doc.data()['EVSE Max Current'],
+      x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
+      y: doc.data()['EVSE Max Current'] ? +doc.data()['EVSE Max Current'] : 1,
     }));
+
+    // calculate data for calculated current line
+    // x axis is time
+    // y axis is value of EVSE Calculated Current OR 1 if undefined
     let calcCurrentData = snapShot.docs.map((doc) => ({
-      x: format(doc.data().timestamp._seconds * 1000, 'MM/dd/yy HH:mm:ss'),
+      x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
       y: doc.data()['EVSE Calculated Current']
         ? +doc.data()['EVSE Calculated Current']
-        : +doc.data()['EVSE Max Current'] + 1,
+        : 1,
     }));
+
+    // data returned
     let data = [
       {
         id: 'EVSE Max Current',
-        color: 'hsl(209,70%,50%)',
         data: maxCurrentData,
       },
       {
         id: 'EVSE Calculated Current',
-        color: 'hsl(256,70%,50%)',
         data: calcCurrentData,
       },
     ];
-    response.status(200).json({ success: true, data });
+
+    response.status(200).json({
+      success: true,
+      data,
+      firstDoc: snapShot.docs[0].id,
+      lastDoc: snapShot.docs[length - 1].id,
+    });
   } catch (error) {
-    console.log(error);
+    console.log('error = ', error);
     response.status(400).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * @author Karen S. Diaz
+ * @description Get a charger's current data - used in pagination of data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getPrevCurrent/:id
+ * @access Private
+ */
 const getPrevCurrent = async (request, response) => {
   try {
     let { firstDoc, chargerId } = request.body;
-    let firstQueryDoc = await admin
-      .firestore()
-      .collection('chargers')
-      .doc(chargerId)
+    let ref = admin.firestore().collection('chargers').doc(chargerId);
+    let firstQueryDoc = await ref.collection('snapShots').doc(firstDoc).get();
+
+    let prev = await ref
       .collection('snapShots')
-      .doc(firstDoc)
-      .get();
+      .orderBy('timestamp')
+      .endBefore(firstQueryDoc.data().timestamp)
+      .limitToLast(4);
 
-    let snapShot = await admin
-      .firestore()
-      .collection('chargers')
-      .doc('113882052')
-      .collection('snapShots')
-      .endBefore(firstQueryDoc)
-      .limitToLast(5)
-      .get();
+    let prevSnapShot = await prev.get();
 
-    let data = snapShot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    let data = prevSnapShot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
-    console.log(data);
     response.status(200).json({ success: true, data });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
   }
 };
+
+/**
+ * @author Karen S. Diaz
+ * @description Get a charger's current data - used in pagination of data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getNextCurrent/:id
+ * @access Private
+ */
 const getNextCurrent = async (request, response) => {
   try {
     let { lastDoc, chargerId } = request.body;
-    let lastQueryDoc = await admin
-      .firestore()
-      .collection('chargers')
-      .doc(chargerId)
-      .collection('snapShots')
-      .doc(lastDoc)
-      .get();
-    let snapShot = await admin
-      .firestore()
-      .collection('chargers')
-      .doc('113882052')
-      .collection('snapShots')
-      .startAfter(lastQueryDoc)
-      .limit(5)
-      .get();
-    let data = snapShot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    let ref = admin.firestore().collection('chargers').doc(chargerId);
+    let lastQueryDoc = await ref.collection('snapShots').doc(lastDoc).get();
 
-    console.log(data);
+    let next = await ref
+      .collection('snapShots')
+      .orderBy('timestamp')
+      .startAfter(lastQueryDoc.data().timestamp)
+      .limit(5);
+
+    let nextSnapshot = await next.get();
+    console.log(nextSnapshot.docs);
+    let data = nextSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
     response.status(200).json({ success: true, data });
   } catch (error) {
     console.log(error);
@@ -177,9 +238,18 @@ const getNextCurrent = async (request, response) => {
   }
 };
 
+/**
+ * @author Karen S. Diaz
+ * @description Get a charger's temperature data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getTemperature/:chargerId
+ * @access Private
+ */
 const getTemperature = async (request, response) => {
   try {
     let { chargerId } = request.params;
+    console.log(chargerId);
     let snapShot = await admin
       .firestore()
       .collection('chargers')
@@ -188,21 +258,25 @@ const getTemperature = async (request, response) => {
       .limit(5)
       .get();
 
-    snapShot.docs.map((doc) => console.log(doc.data()));
+    if (snapShot.empty) {
+      throw new Error('No data available for this charger.');
+    }
 
     let temperatureData = snapShot.docs.map((doc) => ({
-      x: format(doc.data().timestamp._seconds * 1000, 'MM/dd/yy HH:mm:ss'),
-      y: +doc
-        .data()['EVSE Temperature'].slice(
-          0,
-          doc.data()['EVSE Temperature'].length - 2
-        ),
+      x: format(doc.data().timestamp._seconds * 1000, 'HH:mm:ss'),
+      y: doc.data()['EVSE Temperature']
+        ? +doc
+            .data()
+            ['EVSE Temperature'].slice(
+              0,
+              doc.data()['EVSE Temperature'].length - 2
+            )
+        : 0,
     }));
-
+    console.log(temperatureData);
     let data = [
       {
         id: 'EVSE Temperature',
-        color: 'hsl(209,70%,50%)',
         data: temperatureData,
       },
     ];
@@ -213,6 +287,14 @@ const getTemperature = async (request, response) => {
   }
 };
 
+/**
+ * @author Karen S. Diaz
+ * @description Get a charger's payment state data
+ * @param {*} request
+ * @param {*} response
+ * @route  PUT /api/chargers/getPaymentState/:id
+ * @access Private
+ */
 const getPaymentState = async (request, response) => {
   try {
     let { chargerId } = request.params;
@@ -223,7 +305,9 @@ const getPaymentState = async (request, response) => {
       .collection('snapShots')
       .limit(5)
       .get();
-
+    if (snapShot.empty) {
+      throw new Error('No data available for this charger.');
+    }
     let valuesMap = {};
     let paymentData = [];
 
@@ -238,7 +322,6 @@ const getPaymentState = async (request, response) => {
     }
 
     for (let val of Object.keys(valuesMap)) {
-      console.log(typeof val);
       let avg = (valuesMap[val] / snapShot.docs.length) * 100;
       paymentData.push({
         id: val === 'false' ? 'Not Paid' : 'Paid',
@@ -256,63 +339,61 @@ const getPaymentState = async (request, response) => {
 
 // Eamon's added function
 
-/* 
-* This function will set the passed in charger's 
-* SERVER Disable EVSE? to true and
-* SERVER Enable EVSE? to false
-*/
+/*
+ * This function will set the passed in charger's
+ * SERVER Disable EVSE? to true and
+ * SERVER Enable EVSE? to false
+ */
 const setStationOff = async (request, response) => {
   try {
     let chargers = request.body;
     let chargerID = chargers.charger;
     const update = {
-      "SERVER Disable EVSE?": true,
-      "SERVER Enable EVSE?": false,
+      'SERVER Disable EVSE?': true,
+      'SERVER Enable EVSE?': false,
     };
 
     //let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargerID);
     await chargerRef.update(update);
     response.status(200).json({ success: true, chargerID });
-
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
   }
 };
 
-/* 
-* This function will set the passed in charger's 
-* SERVER Disable EVSE? to false and
-* SERVER Enable EVSE? to true
-*/
+/*
+ * This function will set the passed in charger's
+ * SERVER Disable EVSE? to false and
+ * SERVER Enable EVSE? to true
+ */
 const setStationOn = async (request, response) => {
   try {
     let chargers = request.body;
     let chargerID = chargers.charger;
     const update = {
-      "SERVER Disable EVSE?": false,
-      "SERVER Enable EVSE?": true,
+      'SERVER Disable EVSE?': false,
+      'SERVER Enable EVSE?': true,
     };
 
     //let chargerId = request.params.chargerId.toString();
     let chargerRef = admin.database().ref(chargers.charger);
     await chargerRef.update(update);
     response.status(200).json({ success: true, chargerID });
-
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
   }
 };
 
-/* 
-* This function get the user id assigned to the charger
-*/
+/*
+ * This function get the user id assigned to the charger
+ */
 const getUser = async (request, response) => {
   try {
     let { chargerId } = request.params;
-    console.log("Performing getUser on charger " + chargerId);
+    console.log('Performing getUser on charger ' + chargerId);
 
     let snapShot = await admin.database().ref(chargerId).get();
 
@@ -325,16 +406,16 @@ const getUser = async (request, response) => {
   }
 };
 
-/* 
-* This function sets the user id assigned to the charger
-*/
+/*
+ * This function sets the user id assigned to the charger
+ */
 const setUser = async (request, response) => {
   try {
     let info = request.body;
     let chargerID = info.charger;
     let User = info.user;
     const update = {
-      "SERVER User Sync": User,
+      'SERVER User Sync': User,
     };
     let chargerRef = admin.database().ref(chargerID);
     await chargerRef.update(update);
@@ -345,59 +426,84 @@ const setUser = async (request, response) => {
   }
 };
 
-/* 
-* This function removes the user id assigned to the charger
-*/
+/*
+ * This function removes the user id assigned to the charger
+ */
 const removeUser = async (request, response) => {
   try {
     let info = request.body;
     let chargerID = info.charger;
     const update = {
-      "SERVER User Sync": "",
+      'SERVER User Sync': '',
     };
     let chargerRef = admin.database().ref(chargerID);
     await chargerRef.update(update);
-    response.status(200).json({ success: true});
+    response.status(200).json({ success: true });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
   }
 };
 
-
 /*
-* This function will get a list of charger snapshots for the specifed charger
-*/
+ * This function will get a list of charger snapshots for the specifed charger
+ */
 const chargerHistory = async (request, response) => {
   try {
     let { chargerId } = request.params;
     var dataArray = chargerId.split(';');
     var snapShot;
-    console.log("Performing chargerHistory on charger " + dataArray[0]);
+    console.log('Performing chargerHistory on charger ' + dataArray[0]);
 
     if (dataArray[2] == null) {
       if (dataArray[1] == null) {
         var today = new Date();
-        var date = today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate();
+        var date =
+          today.getFullYear() +
+          '-' +
+          (today.getMonth() + 1) +
+          '-' +
+          today.getDate();
         const start = admin.firestore.Timestamp.fromDate(new Date(date));
-        snapShot = await admin.firestore().collection('chargers').doc(dataArray[0]).collection('snapShots')
-        .where('timestamp', '>=', start).get();
+        snapShot = await admin
+          .firestore()
+          .collection('chargers')
+          .doc(dataArray[0])
+          .collection('snapShots')
+          .where('timestamp', '>=', start)
+          .get();
       } else {
-        const start = admin.firestore.Timestamp.fromDate(new Date(dataArray[1]));
-        snapShot = await admin.firestore().collection('chargers').doc(dataArray[0]).collection('snapShots')
-      .where('timestamp', '>=', start).get();
+        const start = admin.firestore.Timestamp.fromDate(
+          new Date(dataArray[1])
+        );
+        snapShot = await admin
+          .firestore()
+          .collection('chargers')
+          .doc(dataArray[0])
+          .collection('snapShots')
+          .where('timestamp', '>=', start)
+          .get();
       }
     } else {
       var tomorrow = new Date(dataArray[2]);
       tomorrow.setDate(tomorrow.getDate() + 1);
       const start = admin.firestore.Timestamp.fromDate(new Date(dataArray[1]));
       const end = admin.firestore.Timestamp.fromDate(tomorrow);
-      snapShot = await admin.firestore().collection('chargers').doc(dataArray[0]).collection('snapShots')
-      .where('timestamp', '>=', start).where('timestamp', '<=', end).get();
+      snapShot = await admin
+        .firestore()
+        .collection('chargers')
+        .doc(dataArray[0])
+        .collection('snapShots')
+        .where('timestamp', '>=', start)
+        .where('timestamp', '<=', end)
+        .get();
     }
 
     let historyData = snapShot.docs.map((doc) => ({
-      timestamp: format(doc.data().timestamp._seconds * 1000, 'MM/dd/yy HH:mm:ss'),
+      timestamp: format(
+        doc.data().timestamp._seconds * 1000,
+        'MM/dd/yy HH:mm:ss'
+      ),
       data: doc.data(),
     }));
 
@@ -415,13 +521,11 @@ const chargerHistory = async (request, response) => {
   }
 };
 
-
-
 // End of  Eamon's added function
-
 
 module.exports = {
   getAllChargers,
+  getCharger,
   addCharger,
   updateCharger,
   getCurrent,
@@ -430,122 +534,9 @@ module.exports = {
   getTemperature,
   getPaymentState,
   setStationOff, // added by Eamon
-  setStationOn, // added by Eamon 
+  setStationOn, // added by Eamon
   getUser, //added by Eamon
   setUser, // added by Eamon
   removeUser, // added by Eamon
   chargerHistory, // added by Eamon
 };
-
-// dashApp.use(cors({ origin: true }));
-
-// dashApp.get('/filterData', async (request, response) => {
-//   const chargerId = request.body.id;
-
-//   try {
-//     let snapshot = await admin
-//       .firestore()
-//       .collection('chargers')
-//       .doc(chargerId)
-//       .collection('snapShots')
-//       .get();
-
-//     let data = snapshot.docs.map((doc) => {
-//       return { id: doc.id, ...doc.data() };
-//     });
-//     response.status(200).send({ data });
-//   } catch (error) {
-//     response.status(400).send({ error: error.message });
-//   }
-// });
-
-// dashApp.get('/filterByDate', async (request, response) => {
-//   // To Do - Confirm time coming from front end is in utc
-//   const time = new Date(request.body.time);
-
-//   const chargerId = request.body.id;
-//   try {
-//     let snapshot = await admin
-//       .firestore()
-//       .collection('chargers')
-//       .doc(chargerId)
-//       .collection('snapShots')
-//       .where('timestamp', '>=', time)
-//       .get();
-//     let data = snapshot.docs.map((doc) => {
-//       console.log(doc.data().timestamp.toDate());
-//       return { id: doc.id, ...doc.data() };
-//     });
-//     response.status(200).send({ data });
-//   } catch (error) {
-//     response.status(400).send({ error: error.message });
-//   }
-// });
-
-// dashApp.get('/filterByTime', async (request, response) => {
-//   const time = new Date(request.body.time);
-//   console.log(time.getUTCDate());
-//   console.log(time);
-//   const chargerId = request.body.id;
-//   try {
-//     let snapshot = await admin
-//       .firestore()
-//       .collection('chargers')
-//       .doc(chargerId)
-//       .collection('snapShots')
-//       .where('timestamp', '>=', time)
-//       .get();
-//     let data = snapshot.docs.map((doc) => {
-//       console.log(doc.data().timestamp.toDate());
-//       return { id: doc.id, ...doc.data() };
-//     });
-//     response.status(200).send({ data });
-//   } catch (error) {
-//     response.status(400).send({ error: error.message });
-//   }
-// });
-
-// dashApp.get('/getAggregate', async (request, response) => {
-//   //   response.set('Access-Control-Allow-Origin', '*');
-//   //   response.set('Access-Control-Allow-Methods', 'GET, PUT, POST, OPTIONS');
-//   //   response.set('Access-Control-Allow-Headers', '*');
-//   try {
-//     let data = [];
-//     let chargers = await admin.firestore().collection('chargers').get();
-//     let numChargers = 0;
-//     numChargers = chargers.docs.length;
-//     let rtdb = admin.database().ref();
-//     let available = numChargers * 30;
-//     //Not needed for now
-//     // let now = new Date();
-//     // let i = 6;
-//     // let dates = [now.getDate()];
-//     // while (i--) {
-//     //   now.setDate(now.getDate() - 1);
-//     //   dates.push(now.toUTCString());
-//     // }
-//     // dates.reverse();
-//     // console.log('Dates Array', dates);
-
-//     let snapshot = await admin
-//       .firestore()
-//       .collection('chargers')
-//       .doc('113882052')
-//       .collection('snapShots')
-//       .get();
-
-//     const { allocated } = await getAllocated(rtdb);
-
-//     data = snapshot.docs.map((doc) => {
-//       return { id: doc.id, allocated, available, ...doc.data() };
-//     });
-
-//     response.status(200).send({ allocated, available, data });
-//   } catch (err) {
-//     response.status(400).send({ error: err.message });
-//   }
-
-//   return new Promise((resolve, reject) => {});
-// });
-
-// exports.api = functions.https.onRequest(dashApp);
