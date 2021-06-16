@@ -1,6 +1,7 @@
 const { admin, historicalAdmin } = require('../adminApp');
 const { getAllocated } = require('../getAllocated');
 const { format } = require('date-fns');
+const jwt = require('jsonwebtoken');
 
 /**
  * @author Karen S. Diaz
@@ -266,8 +267,7 @@ const getTemperature = async (request, response) => {
       x: format(doc.data().timestamp._seconds * 1000, 'HH:mm:ss'),
       y: doc.data()['EVSE Temperature']
         ? +doc
-            .data()
-            ['EVSE Temperature'].slice(
+            .data()['EVSE Temperature'].slice(
               0,
               doc.data()['EVSE Temperature'].length - 2
             )
@@ -394,6 +394,9 @@ const getUser = async (request, response) => {
   try {
     let { chargerId } = request.params;
     console.log('Performing getUser on charger ' + chargerId);
+    // const key = admin.firestore().collection("test").doc().id;
+    // console.log(key);
+    // await admin.firestore().collection('users').doc('userID').update({apiKey: key});
 
     let snapShot = await admin.database().ref(chargerId).get();
 
@@ -451,12 +454,14 @@ const removeUser = async (request, response) => {
 const chargerHistory = async (request, response) => {
   try {
     let { chargerId } = request.params;
-    var dataArray = chargerId.split(';');
+    var dataArray = await chargerId.split(';');
     var snapShot;
-    console.log('Performing chargerHistory on charger ' + dataArray[0]);
+    await console.log('Performing chargerHistory on charger ' + dataArray[0]);
 
-    if (dataArray[2] == null) {
-      if (dataArray[1] == null) {
+    if (typeof dataArray[2] !== 'string') {
+      // dataArray[2] is null
+      if (typeof dataArray[1] !== 'string') {
+        // dataArray[1] is null
         var today = new Date();
         var date =
           today.getFullYear() +
@@ -473,9 +478,9 @@ const chargerHistory = async (request, response) => {
           .where('timestamp', '>=', start)
           .get();
       } else {
+        // dataArray[1] is not null
         const start = admin.firestore.Timestamp.fromDate(
-          new Date(dataArray[1])
-        );
+          new Date(dataArray[1]));
         snapShot = await admin
           .firestore()
           .collection('chargers')
@@ -485,10 +490,9 @@ const chargerHistory = async (request, response) => {
           .get();
       }
     } else {
-      var tomorrow = new Date(dataArray[2]);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+      // dataArray[2] is not null
       const start = admin.firestore.Timestamp.fromDate(new Date(dataArray[1]));
-      const end = admin.firestore.Timestamp.fromDate(tomorrow);
+      const end = admin.firestore.Timestamp.fromDate(new Date(dataArray[2]));
       snapShot = await admin
         .firestore()
         .collection('chargers')
@@ -521,6 +525,49 @@ const chargerHistory = async (request, response) => {
   }
 };
 
+/*
+ * This function makes a token for the user
+ */
+const getToken = async (request, response) => {
+  try {
+    let {apiKey} = request.params;
+    let wrongKey = "Invalid API Key";
+    let wrongUser = "An error occurred authenticating the user";
+    var uid;
+    var userdata;
+    var key = await admin.firestore().collection('apiTokenKey').doc('secretToken').get('token');
+    var encode = key.data().token;
+    console.log('Getting Token ');
+    await admin.firestore().collection('apiKeys').doc(apiKey).get().then((docSnapshot) => { 
+      if (docSnapshot.exists) {
+        uid = docSnapshot.data().uid;
+      } else {
+        console.log('No such document!');
+        response.status(400).json({ success: false, error: wrongKey });
+      }
+      return null;
+    });
+
+    await admin.firestore().collection('users').doc(' 7phNIjHMgpajkALvSBbl5JhuUJy1').get().then((docSnapshot) => { 
+      if (docSnapshot.exists) {
+        userdata = docSnapshot.data().chargers;
+      } else {
+        console.log('No such user!');
+        response.status(400).json({ success: false, error: wrongUser});
+      }
+      return null;
+    });
+
+    var token = jwt.sign({ TOKEN: userdata }, encode);
+    response.status(200).json({token});
+
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+
 // End of  Eamon's added function
 
 module.exports = {
@@ -539,4 +586,5 @@ module.exports = {
   setUser, // added by Eamon
   removeUser, // added by Eamon
   chargerHistory, // added by Eamon
+  getToken, // added by Eamon
 };

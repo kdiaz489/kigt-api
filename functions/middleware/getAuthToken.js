@@ -1,4 +1,5 @@
 const { admin } = require('../adminApp');
+const jwt = require('jsonwebtoken');
 
 /**
  * Middleware. Gets auth token from client side request.
@@ -32,4 +33,61 @@ exports.checkIfAuthenticated = (req, res, next) => {
         .json({ error: 'You are not authorized to make this request' });
     }
   });
+};
+
+// Added by Eamon
+/**
+ * Middleware. Checks API Key for validity.
+ * @param {*} req
+ * @param {*} res
+ * @param {*} next
+ */
+exports.checkKey = async (request, response, next) => {
+  let {apiKey} = request.params;
+  let wrongKey = "Invalid API Key";
+  await admin.firestore().collection('apiKeys').doc(apiKey).get().then((docSnapshot) => { 
+    if (docSnapshot.exists) {
+      next();
+    } else {
+      console.log('No such document!');
+      response.status(400).json({ success: false, error: wrongKey });
+
+    }
+    return null;
+  });
+};
+
+// Added by Eamon
+/**
+ * Middleware. Checks Token for validity.
+ * @param {*} req
+ * @param {*} res
+ * @param {*} next
+ */
+ exports.checkToken = async (request, response, next) => {
+  let {token} = request.params;
+  let {chargerId} = request.params;
+  let wrongPermission = "You do not have permission to accesses this charger";
+  var permission = false;
+
+  var key = await admin.firestore().collection('apiTokenKey').doc('secretToken').get('token');
+  var encode = key.data().token;
+
+  var decryptedToken = jwt.decode(token, encode);
+
+  decryptedToken.TOKEN.forEach(function(entry) {
+
+    if (entry.chargerName == chargerId) {
+      permission = true;
+    }
+  });
+
+  if (permission === true) {
+    next();
+  } else {
+    console.log('Wrong Permission!');
+    response.status(400).json({ success: false, error: wrongPermission });
+
+  }
+
 };
