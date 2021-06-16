@@ -51,7 +51,7 @@ const generateApiKey = async (request, response) => {
 
   // console.log(key);
   await admin.firestore().collection('users').doc(uid).update({ apiKey: key });
-  return key;
+  return response.status(200).json({ success: true, key });
 };
 
 module.exports = {
