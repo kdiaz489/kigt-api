@@ -535,7 +535,7 @@ const getToken = async (request, response) => {
     let wrongUser = "An error occurred authenticating the user";
     var uid;
     var userdata;
-    var key = await admin.firestore().collection('apiTokenKey').doc('secretToken').get('token');
+    var key = await admin.firestore().collection('apiTokenEncryptionKey').doc('secretToken').get('token');
     var encode = key.data().token;
     console.log('Getting Token ');
     await admin.firestore().collection('apiKeys').doc(apiKey).get().then((docSnapshot) => { 

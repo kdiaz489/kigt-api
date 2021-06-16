@@ -48,6 +48,7 @@ exports.checkKey = async (request, response, next) => {
   await admin.firestore().collection('apiKeys').doc(apiKey).get().then((docSnapshot) => { 
     if (docSnapshot.exists) {
       next();
+      return null;
     } else {
       console.log('No such document!');
       response.status(400).json({ success: false, error: wrongKey });
@@ -77,13 +78,14 @@ exports.checkKey = async (request, response, next) => {
 
   decryptedToken.TOKEN.forEach(function(entry) {
 
-    if (entry.chargerName == chargerId) {
+    if (entry.chargerName === chargerId) {
       permission = true;
     }
   });
 
   if (permission === true) {
     next();
+    return null;
   } else {
     console.log('Wrong Permission!');
     response.status(400).json({ success: false, error: wrongPermission });
