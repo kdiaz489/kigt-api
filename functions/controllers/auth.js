@@ -43,7 +43,19 @@ const updateAccount = async (request, response) => {
     return response.status(401).json({ success: false, error: error.message });
   }
 };
+
+const generateApiKey = async (request, response) => {
+  const { uid } = request;
+  console.log(uid);
+  const key = await admin.firestore().collection('test').doc().id;
+
+  // console.log(key);
+  await admin.firestore().collection('users').doc(uid).update({ apiKey: key });
+  return response.status(200).json({ success: true, key });
+};
+
 module.exports = {
   register,
   updateAccount,
+  generateApiKey,
 };

@@ -4,5 +4,6 @@ const { checkIfAuthenticated } = require('../middleware/getAuthToken');
 
 router.post('/register', controller.register);
 router.put('/updateaccount', checkIfAuthenticated, controller.updateAccount);
+router.put('/genApiKey', checkIfAuthenticated, controller.generateApiKey);
 
 module.exports = router;
