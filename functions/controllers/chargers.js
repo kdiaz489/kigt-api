@@ -41,7 +41,7 @@ const getAllChargers = async (request, response) => {
       .get();
 
     let user = userSnapShot.docs[0];
-    console.log(user.data());
+
     let usersChargers = user.data().chargers;
     let rootSnapshot = await admin.database().ref().once('value');
     let rootObject = rootSnapshot.val();
@@ -91,17 +91,24 @@ const addCharger = async (request, response) => {
  * @description Update charger
  * @param {*} request
  * @param {*} response
- * @route  PUT /api/chargers/:id
+ * @route  PUT /api/chargers/:chargerId
  * @access Private
  */
 
 const updateCharger = async (request, response) => {
   try {
     let updates = request.body;
+
     let chargerId = request.params.chargerId.toString();
+    console.log('updates = ', updates);
+    console.log('Charger Id = ', chargerId);
     let chargerRef = admin.database().ref(chargerId);
-    await chargerRef.update(updates);
-    response.status(200).json({ success: true });
+
+    let res = await chargerRef.update(updates);
+
+    let snapshot = await chargerRef.once('value');
+    let charger = snapshot.val();
+    response.status(200).json({ success: true, charger });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
@@ -129,38 +136,89 @@ const getCurrent = async (request, response) => {
       .collection('snapShots')
       .limit(4)
       .get();
+
     if (snapShot.empty) {
       throw new Error('No data available for this charger.');
     }
     let length = snapShot.docs.length;
 
-    // calculate data for max current line
+    // Set Current Data
+    // calculate data for max current line on graph
     // x axis is time
-    // y axis is value of EVSE Max Current OR 1 if undefined
-    let maxCurrentData = snapShot.docs.map((doc) => ({
-      x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
-      y: doc.data()['EVSE Max Current'] ? +doc.data()['EVSE Max Current'] : 1,
-    }));
+    // y axis is value of EVSE Max Current OR null if none
+    // if EVSE Max Current is a 5 digit num, divide by 1000
 
+    let setCurrent = snapShot.docs
+      .map((doc) => ({
+        x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
+        y: doc.data()['EVSE Max Current']
+          ? +doc.data()['EVSE Max Current']
+          : null,
+      }))
+      .filter((doc) => doc.y);
+
+    // Measured data
     // calculate data for calculated current line
     // x axis is time
-    // y axis is value of EVSE Calculated Current OR 1 if undefined
-    let calcCurrentData = snapShot.docs.map((doc) => ({
-      x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
-      y: doc.data()['EVSE Calculated Current']
-        ? +doc.data()['EVSE Calculated Current']
-        : 1,
-    }));
+    // y axis is value of EVSE  Current
+
+    let measuredCurrent = snapShot.docs
+      .map((doc) => ({
+        x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
+        y: doc.data()['EVSE Current'] ? +doc.data()['EVSE Current'] : null,
+      }))
+      .filter((doc) => doc.y !== null);
+
+    // // Set Current Data
+    // // x axis is time
+    // // y axis is value of EVSE Max Current
+    // // if EVSE Max Current is a 5 digit num, divide by 1000
+
+    // let setCurrentData = snapShot.docs.filter(
+    //   (doc) => doc.data()['EVSE Max Current']
+    // );
+
+    // setCurrentData = setCurrentData.map((doc) => ({
+    //   x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
+    //   y: +doc.data()['EVSE Max Current'],
+    // }));
+
+    // // Measured data
+    // // calculate data for calculated current line
+    // // x axis is time
+    // // y axis is value of EVSE  Current
+    // let measuredCurrentData = snapShot.docs.filter(
+    //   (doc) => doc.data()['EVSE Current']
+    // );
+
+    // measuredCurrentData = snapShot.docs.map((doc) => ({
+    //   x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
+    //   y: +doc.data()['EVSE Current'],
+    // }));
+
+    // // data returned
+    // let data = [
+    //   {
+    //     id: 'EVSE Set Current',
+    //     data: setCurrentData,
+    //   },
+    //   {
+    //     id: 'EVSE Measured Current',
+    //     data: measuredCurrentData,
+    //   },
+    // ];
 
     // data returned
     let data = [
       {
-        id: 'EVSE Max Current',
-        data: maxCurrentData,
+        id: 'Set Current',
+
+        data: setCurrent,
       },
       {
-        id: 'EVSE Calculated Current',
-        data: calcCurrentData,
+        id: 'Measured Current',
+
+        data: measuredCurrent,
       },
     ];
 
@@ -228,7 +286,7 @@ const getNextCurrent = async (request, response) => {
       .limit(5);
 
     let nextSnapshot = await next.get();
-    console.log(nextSnapshot.docs);
+
     let data = nextSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     response.status(200).json({ success: true, data });
@@ -249,7 +307,7 @@ const getNextCurrent = async (request, response) => {
 const getTemperature = async (request, response) => {
   try {
     let { chargerId } = request.params;
-    console.log(chargerId);
+
     let snapShot = await admin
       .firestore()
       .collection('chargers')
@@ -273,7 +331,7 @@ const getTemperature = async (request, response) => {
             )
         : 0,
     }));
-    console.log(temperatureData);
+
     let data = [
       {
         id: 'EVSE Temperature',
