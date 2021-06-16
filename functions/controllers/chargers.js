@@ -548,7 +548,7 @@ const getToken = async (request, response) => {
       return null;
     });
 
-    await admin.firestore().collection('users').doc(' 7phNIjHMgpajkALvSBbl5JhuUJy1').get().then((docSnapshot) => { 
+    await admin.firestore().collection('users').doc(uid).get().then((docSnapshot) => { 
       if (docSnapshot.exists) {
         userdata = docSnapshot.data().chargers;
       } else {
