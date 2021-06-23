@@ -48,9 +48,27 @@ const generateApiKey = async (request, response) => {
   const { uid } = request;
   console.log(uid);
   const key = await admin.firestore().collection('test').doc().id;
+  
+  // Get the value of the old key before overwriting it
+  const getoldKey = await admin.firestore().collection('users').doc(uid).get();
+  const oldKey = await getoldKey.data().apiKey;
 
   // console.log(key);
   await admin.firestore().collection('users').doc(uid).update({ apiKey: key });
+
+  // create the new key in the apiKeys collection and delete the old key essentially "renaming" it
+  await admin.firestore().collection('apiKeys').doc(oldKey).get().then(async (docSnapshot) => { 
+    if (docSnapshot.exists) {
+      var data = docSnapshot.data();
+      await admin.firestore().collection('apiKeys').doc(key).set(data);
+      await admin.firestore().collection('apiKeys').doc(oldKey).delete();
+    } else {
+      await admin.firestore().collection('apiKeys').doc(key).set({uid: uid});
+    }
+    return null;
+  });
+
+
   return response.status(200).json({ success: true, key });
 };
 

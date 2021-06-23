@@ -71,7 +71,7 @@ exports.checkKey = async (request, response, next) => {
   let wrongPermission = "You do not have permission to accesses this charger";
   var permission = false;
 
-  var key = await admin.firestore().collection('apiTokenKey').doc('secretToken').get('token');
+  var key = await admin.firestore().collection('apiTokenEncryptionKey').doc('secretToken').get('token');
   var encode = key.data().token;
 
   var decryptedToken = jwt.decode(token, encode);
