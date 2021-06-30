@@ -404,17 +404,16 @@ const getPaymentState = async (request, response) => {
  */
 const setStationOff = async (request, response) => {
   try {
-    let chargers = request.body;
-    let chargerID = chargers.charger;
+    let { chargerId } = request.params;
     const update = {
       'SERVER Disable EVSE?': true,
       'SERVER Enable EVSE?': false,
     };
 
     //let chargerId = request.params.chargerId.toString();
-    let chargerRef = admin.database().ref(chargerID);
+    let chargerRef = admin.database().ref(chargerId);
     await chargerRef.update(update);
-    response.status(200).json({ success: true, chargerID });
+    response.status(200).json({ success: true, chargerId });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
@@ -428,22 +427,108 @@ const setStationOff = async (request, response) => {
  */
 const setStationOn = async (request, response) => {
   try {
-    let chargers = request.body;
-    let chargerID = chargers.charger;
+    let { chargerId } = request.params;
     const update = {
       'SERVER Disable EVSE?': false,
       'SERVER Enable EVSE?': true,
     };
 
     //let chargerId = request.params.chargerId.toString();
-    let chargerRef = admin.database().ref(chargers.charger);
+    let chargerRef = admin.database().ref(chargerId);
     await chargerRef.update(update);
-    response.status(200).json({ success: true, chargerID });
+    response.status(200).json({ success: true, chargerId });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
   }
 };
+
+
+/*
+ * This function will set the passed in charger's
+ * SERVER Enable QuickPay? to true
+ */
+const setQuickpay = async (request, response) => {
+  try {
+    let { chargerId } = request.params;
+    const update = {
+      'SERVER Enable QuickPay?': true
+    };
+
+    let chargerRef = admin.database().ref(chargerId);
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, chargerId });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+
+/*
+ * This function will set the passed in charger's
+ * SERVER Pause EVSE? to true
+ */
+const setPause = async (request, response) => {
+  try {
+    let { chargerId } = request.params;
+    const update = {
+      'SERVER Pause EVSE?': true
+    };
+
+    let chargerRef = admin.database().ref(chargerId);
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, chargerId });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+
+/*
+ * This function will set the passed in charger's
+ * SERVER Reset EVSE? to true
+ */
+const setReset = async (request, response) => {
+  try {
+    let { chargerId } = request.params;
+    const update = {
+      'SERVER Reset EVSE?': true
+    };
+
+    let chargerRef = admin.database().ref(chargerId);
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, chargerId });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+
+/*
+ * This function will set the passed in charger's
+ * SERVER Reset EVSE? to true
+ */
+const setTransactionAmount = async (request, response) => {
+  try {
+    let { chargerId } = request.params;
+    let { amount } = request.params;
+    let inCents = parseInt(amount, 10);
+    const update = {
+      'SERVER Set Transaction Amount': inCents
+    };
+
+    let chargerRef = admin.database().ref(chargerId);
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, chargerId, SetPrice: inCents });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
 
 /*
  * This function get the user id assigned to the charger
@@ -472,15 +557,14 @@ const getUser = async (request, response) => {
  */
 const setUser = async (request, response) => {
   try {
-    let info = request.body;
-    let chargerID = info.charger;
-    let User = info.user;
+    let { chargerId } = request.params;
+    let { userId } = request.params;
     const update = {
-      'SERVER User Sync': User,
+      'SERVER User Sync': userId,
     };
-    let chargerRef = admin.database().ref(chargerID);
+    let chargerRef = admin.database().ref(chargerId);
     await chargerRef.update(update);
-    response.status(200).json({ success: true, User });
+    response.status(200).json({ success: true, userId });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
@@ -492,12 +576,11 @@ const setUser = async (request, response) => {
  */
 const removeUser = async (request, response) => {
   try {
-    let info = request.body;
-    let chargerID = info.charger;
+    let { chargerId } = request.params;
     const update = {
       'SERVER User Sync': '',
     };
-    let chargerRef = admin.database().ref(chargerID);
+    let chargerRef = admin.database().ref(chargerId);
     await chargerRef.update(update);
     response.status(200).json({ success: true });
   } catch (error) {
@@ -595,6 +678,8 @@ const getToken = async (request, response) => {
     var userdata;
     var key = await admin.firestore().collection('apiTokenEncryptionKey').doc('secretToken').get('token');
     var encode = key.data().token;
+    var today =  await new Date();
+    var nextTime = await new Date(today.getTime() + 10 * 60000);
     console.log('Getting Token ');
     await admin.firestore().collection('apiKeys').doc(apiKey).get().then((docSnapshot) => { 
       if (docSnapshot.exists) {
@@ -616,7 +701,7 @@ const getToken = async (request, response) => {
       return null;
     });
 
-    var token = jwt.sign({ TOKEN: userdata }, encode);
+    var token = jwt.sign({ TOKEN: userdata, EXPIRATION: nextTime }, encode);
     response.status(200).json({token});
 
   } catch (error) {
@@ -640,6 +725,10 @@ module.exports = {
   getPaymentState,
   setStationOff, // added by Eamon
   setStationOn, // added by Eamon
+  setQuickpay, // added by Eamon
+  setPause, // added by Eamon
+  setReset, // added by Eamon
+  setTransactionAmount, // added by Eamon
   getUser, //added by Eamon
   setUser, // added by Eamon
   removeUser, // added by Eamon

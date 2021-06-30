@@ -69,12 +69,22 @@ exports.checkKey = async (request, response, next) => {
   let {token} = request.params;
   let {chargerId} = request.params;
   let wrongPermission = "You do not have permission to accesses this charger";
+  let expiredToken = "Your Token has expired please reissue a new Token gueing the getToken call";
   var permission = false;
 
   var key = await admin.firestore().collection('apiTokenEncryptionKey').doc('secretToken').get('token');
   var encode = key.data().token;
 
   var decryptedToken = jwt.decode(token, encode);
+
+  console.log(decryptedToken);
+   var today =  await new Date();
+  // console.log(today);
+   var nextTime = await new Date(decryptedToken.EXPIRATION);
+   if (today > nextTime) {
+    console.log('Token expired!');
+    response.status(400).json({ success: false, error: expiredToken });
+   }
 
   decryptedToken.TOKEN.forEach(function(entry) {
 

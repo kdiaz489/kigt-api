@@ -19,11 +19,15 @@ router.get('/getPaymentState/:token/:chargerId', controller.getPaymentState);
 router.get('/user/:token/:chargerId', checkToken, controller.getUser); // added by Eamon
 router.get('/token/:apiKey', checkKey, controller.getToken); // added by Eamon
 router.get('/getChargerHistory/:token/:chargerId', checkToken, controller.chargerHistory); // added by Eamon
-router.post('/', checkIfAuthenticated, checkToken, controller.addCharger);
+router.post('/', checkIfAuthenticated, controller.addCharger);
 router.put('/updateCharger/:token/:chargerId', checkToken, controller.updateCharger);
-router.put('/setStationOff/:token', checkToken, controller.setStationOff); // added by Eamon
-router.put('/setStationOn/:token', checkToken, controller.setStationOn); // added by Eamon
-router.put('/user/:token', checkToken, controller.setUser); // added by Eamon
-router.delete('/user/:token', checkToken, controller.removeUser); // added by Eamon
+router.put('/setStationOff/:token/:chargerId', checkToken, controller.setStationOff); // added by Eamon
+router.put('/setStationOn/:token/:chargerId', checkToken, controller.setStationOn); // added by Eamon
+router.put('/setQuickpay/:token/:chargerId', checkToken, controller.setQuickpay); // added by Eamon
+router.put('/setPause/:token/:chargerId', checkToken, controller.setPause); // added by Eamon
+router.put('/setReset/:token/:chargerId', checkToken, controller.setReset); // added by Eamon
+router.put('/setTransactionAmount/:token/:chargerId/:amount', checkToken, controller.setTransactionAmount); // added by Eamon
+router.put('/user/:token/:chargerId/:userId', checkToken, controller.setUser); // added by Eamon
+router.delete('/user/:token/:chargerId', checkToken, controller.removeUser); // added by Eamon
 
 module.exports = router;
