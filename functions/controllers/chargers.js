@@ -509,7 +509,7 @@ const setReset = async (request, response) => {
 
 /*
  * This function will set the passed in charger's
- * SERVER Reset EVSE? to true
+ * SERVER Set Transaction Amount to the passed in amount for amount
  */
 const setTransactionAmount = async (request, response) => {
   try {
@@ -523,6 +523,34 @@ const setTransactionAmount = async (request, response) => {
     let chargerRef = admin.database().ref(chargerId);
     await chargerRef.update(update);
     response.status(200).json({ success: true, chargerId, SetPrice: inCents });
+  } catch (error) {
+    console.log(error);
+    response.status(400).json({ success: false, error: error.message });
+  }
+};
+
+
+/*
+ * This function will set the passed in charger's
+ * SERVER Set Current Max to the passed in amount for current
+ */
+const setCurrent = async (request, response) => {
+  try {
+    let { chargerId } = request.params;
+    let { current } = request.params;
+    let maxCurrent = await parseInt(current, 10);
+    if (await maxCurrent < 6) {
+      maxCurrent = 6;
+    } else  if ( await maxCurrent > 28) {
+      maxCurrent = 28;
+    }
+    const update = {
+      'SERVER Set Current Max': maxCurrent
+    };
+
+    let chargerRef = admin.database().ref(chargerId);
+    await chargerRef.update(update);
+    response.status(200).json({ success: true, chargerId, SetMaxCurrent: maxCurrent });
   } catch (error) {
     console.log(error);
     response.status(400).json({ success: false, error: error.message });
@@ -729,6 +757,7 @@ module.exports = {
   setPause, // added by Eamon
   setReset, // added by Eamon
   setTransactionAmount, // added by Eamon
+  setCurrent, // added by Eamon
   getUser, //added by Eamon
   setUser, // added by Eamon
   removeUser, // added by Eamon

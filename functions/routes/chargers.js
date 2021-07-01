@@ -27,6 +27,7 @@ router.put('/setQuickpay/:token/:chargerId', checkToken, controller.setQuickpay)
 router.put('/setPause/:token/:chargerId', checkToken, controller.setPause); // added by Eamon
 router.put('/setReset/:token/:chargerId', checkToken, controller.setReset); // added by Eamon
 router.put('/setTransactionAmount/:token/:chargerId/:amount', checkToken, controller.setTransactionAmount); // added by Eamon
+router.put('/setCurrent/:token/:chargerId/:current', checkToken, controller.setCurrent); // added by Eamon
 router.put('/user/:token/:chargerId/:userId', checkToken, controller.setUser); // added by Eamon
 router.delete('/user/:token/:chargerId', checkToken, controller.removeUser); // added by Eamon
 
