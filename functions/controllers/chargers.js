@@ -153,7 +153,7 @@ const getCurrent = async (request, response) => {
       .map((doc) => ({
         x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
         y: doc.data()['EVSE Max Current']
-          ? +doc.data()['EVSE Max Current']
+          ? Number(doc.data()['EVSE Max Current'])
           : null,
       }))
       .filter((doc) => doc.y);
@@ -166,7 +166,7 @@ const getCurrent = async (request, response) => {
     let measuredCurrent = snapShot.docs
       .map((doc) => ({
         x: format(doc.data().timestamp._seconds * 1000, 'HH:mm'),
-        y: doc.data()['EVSE Current'] ? +doc.data()['EVSE Current'] : null,
+        y: doc.data()['EVSE Current'] ? Number(doc.data()['EVSE Current']) : null,
       }))
       .filter((doc) => doc.y !== null);
 
@@ -324,11 +324,11 @@ const getTemperature = async (request, response) => {
     let temperatureData = snapShot.docs.map((doc) => ({
       x: format(doc.data().timestamp._seconds * 1000, 'HH:mm:ss'),
       y: doc.data()['EVSE Temperature']
-        ? +doc
-            .data()['EVSE Temperature'].slice(
-              0,
-              doc.data()['EVSE Temperature'].length - 2
-            )
+        ? Number(doc
+          .data()['EVSE Temperature'].slice(
+            0,
+            doc.data()['EVSE Temperature'].length - 2
+          ))
         : 0,
     }));
 
