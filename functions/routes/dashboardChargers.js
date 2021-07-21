@@ -11,12 +11,12 @@ router.get(
   controller.getCharger
 );
 
-router.get('/getCurrent/:token/:chargerId', controller.getCurrent);
-router.get('/getNextCurrent/:token/:chargerId', controller.getNextCurrent);
-router.get('/getPrevCurrent/:token/:chargerId', controller.getPrevCurrent);
-router.get('/getTemperature/:token/:chargerId', controller.getTemperature);
-router.get('/getPaymentState/:token/:chargerId', controller.getPaymentState);
+router.get('/getCurrent/:chargerId', controller.getCurrent);
+router.get('/getNextCurrent/:chargerId', controller.getNextCurrent);
+router.get('/getPrevCurrent/:chargerId', controller.getPrevCurrent);
+router.get('/getTemperature/:chargerId', controller.getTemperature);
+router.get('/getPaymentState/:chargerId', controller.getPaymentState);
 router.post('/', checkIfAuthenticated, controller.addCharger);
-router.put('/updateCharger/:token/:chargerId', controller.updateCharger);
+router.put('/updateCharger/:chargerId', controller.updateCharger);
 
 module.exports = router;
