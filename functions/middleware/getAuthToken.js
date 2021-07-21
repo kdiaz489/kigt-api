@@ -75,6 +75,13 @@ exports.checkKey = async (request, response, next) => {
   var key = await admin.firestore().collection('apiTokenEncryptionKey').doc('secretToken').get('token');
   var encode = key.data().token;
 
+  jwt.verify(token, encode, function(err, decoded) {
+    if (err) {
+      console.log(err);
+      response.status(400).json({ success: false, error: err });
+    }
+  });
+
   var decryptedToken = jwt.decode(token, encode);
 
   console.log(decryptedToken);
