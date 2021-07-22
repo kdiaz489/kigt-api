@@ -68,6 +68,8 @@ exports.checkKey = async (request, response, next) => {
  exports.checkToken = async (request, response, next) => {
   let {token} = request.params;
   let {chargerId} = request.params;
+  var mychargerId = await chargerId.split(';');
+  var parsedId = mychargerId[0];
   let wrongPermission = "You do not have permission to accesses this charger";
   let expiredToken = "Your Token has expired please reissue a new Token gueing the getToken call";
   var permission = false;
@@ -95,7 +97,7 @@ exports.checkKey = async (request, response, next) => {
 
   decryptedToken.TOKEN.forEach(function(entry) {
 
-    if (entry.chargerName === chargerId) {
+    if (entry.chargerName === parsedId) {
       permission = true;
     }
   });
